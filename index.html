@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>U PETSTIGE App Prototype</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Inspired by the warm/friendly image provided
+                        'pet-primary': '#E06D55', // Warm Red/Orange
+                        'pet-secondary': '#FBE5D8', // Light Tan/Peach
+                        'pet-background': '#FFFFFF',
+                        'pet-dark': '#4A4A4A',
+                        'pet-accent': '#5DACE3', // Blue for insurance/actions
+                        'tip-blue': '#0097D7', // TIP Insurance
+                        'muang-thai-red': '#E51F27', // Muang Thai Insurance
+                        'register-brown': '#E06D55', // New primary color for registration CTA
+                        'apply-gray': '#4B5563', // New color for card application CTA
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        /* IMPLEMENTING IPHONE 17 PRO RESOLUTION */
+        #app-root {
+            max-width: 430px; /* iPhone 17 Pro width approx */
+            height: 95vh; /* Taller screen */
+            margin: 20px auto;
+            border-radius: 2rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            overflow: hidden;
+            background-color: #fff;
+            position: relative; /* Needed for modals */
+        }
+
+        .scrollable-content {
+            height: calc(95vh - 72px); /* Adjusted for taller screen header */
+            overflow-y: auto;
+            padding-bottom: 2rem;
+        }
+        
+        .promo-card {
+            background-color: white;
+            padding: 1rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Modal Styles */
+        .modal-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: flex-end; /* Modal slides up from bottom */
+            z-index: 50;
+        }
+
+        .modal-content {
+            background-color: white;
+            width: 100%;
+            max-height: 80%;
+            padding: 1.5rem;
+            border-top-left-radius: 1.5rem;
+            border-top-right-radius: 1.5rem;
+            animation: slideUp 0.3s ease-out;
+            overflow-y: auto;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans">
+    <!-- Firebase Initialization (Required for Canvas) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global variables provided by Canvas - SAFELY define variables first.
+        let firebaseConfig = {};
+        let initialAuthToken = null;
+
+        if (typeof __firebase_config !== 'undefined') {
+            try {
+                firebaseConfig = JSON.parse(__firebase_config);
+            } catch (e) {
+                console.error("Error parsing __firebase_config:", e);
+            }
+        }
+        
+        if (typeof __initial_auth_token !== 'undefined') {
+             initialAuthToken = __initial_auth_token;
+        }
+
+
+        let app, db, auth;
+
+        try {
+            app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+            
+            // Use the safely assigned local variable
+            if (initialAuthToken) {
+                signInWithCustomToken(auth, initialAuthToken);
+            } else {
+                signInAnonymously(auth);
+            }
+        } catch (e) {
+            console.error("Firebase initialization or authentication error:", e);
+        }
+    </script>
+
+    <div id="app-root">
+        <!-- Content will be injected here -->
+    </div>
+
+    <!-- Modal Container -->
+    <div id="modal-root"></div>
+
+    <script>
+        // --- App State Management & Data ---
+        let currentPage = 'home';
+        const petData = {
+            name: 'Max',
+            type: 'Golden Retriever (Dog)',
+            age: '4 Years Old',
+            owner: 'Muay',
+            microchip: '5567-9002-A',
+            vet: 'Pet Health Center',
+            last_vax: '2025-01-15'
+        };
+        
+        const trendContents = [
+            { id: 1, title: 'The Best Dog-Friendly Cafes', partner: 'BKK Nomad', category: 'Lifestyle', location: 'Ari', exclusive: true },
+            { id: 2, title: 'Puppy Yoga Workshop', partner: 'PuppyYogaBKK', category: 'Activities', location: 'Sukhumvit', popular: true },
+            { id: 3, title: 'New Grooming Styles for Winter', partner: 'The Paw Spa', category: 'Supplies', location: 'Siam', exclusive: false },
+            { id: 4, title: 'How to Switch Pet Food Easily', partner: 'Nutrition Experts', category: 'Health', location: 'Online', exclusive: false },
+            { id: 5, title: 'Dog In Town Ari Review', partner: 'Cafe Guide TH', category: 'Lifestyle', location: 'Ari', popular: true },
+            { id: 6, title: 'DIY Pet Toys at Home', partner: 'Crafty Paws', category: 'Activities', location: 'Online', exclusive: false },
+            { id: 7, title: 'Vet Q&A: Winter Health Tips', partner: 'VET Clinic Group', category: 'Health', location: 'Online', exclusive: true },
+            { id: 8, title: 'Top 10 Pet Accessories', partner: 'Trendy Pets', category: 'Supplies', location: 'Ratchada', popular: true },
+            { id: 9, title: 'Travel Checklist for Cats', partner: 'Cat Travel Club', category: 'Lifestyle', location: 'Online', exclusive: false },
+            { id: 10, title: 'Adoption Day at Shelter X', partner: 'Animal Rescue TH', category: 'Activities', location: 'Ratchada', exclusive: false },
+            { id: 11, title: 'Understanding Dog Behavior', partner: 'Dog Trainer Joe', category: 'Health', location: 'Online', exclusive: true },
+            { id: 12, title: 'Pet Photography Tips', partner: 'Snap & Love', category: 'Activities', location: 'Siam', popular: true },
+        ];
+
+        const transactions = [
+            { id: 1, amount: 8900, merchant: 'VET Clinic A (Surgery)', date: 'Oct 25', applied: false },
+            { id: 2, amount: 2450, merchant: 'Pet Food Online', date: 'Nov 01', applied: false },
+            { id: 3, amount: 1500, merchant: 'Grooming Salon B', date: 'Oct 20', applied: true, plan: '6M @ 0%' },
+            { id: 4, amount: 6500, merchant: 'Pet Travel Ticket', date: 'Oct 15', applied: false },
+        ];
+
+        const petCoverageData = [
+            { name: 'Max', type: 'Dog', avatar: 'M', status: 'Active Coverage', color: 'green-500', icon: 'check-circle' },
+            { name: 'Bella', type: 'Cat', avatar: 'B', status: 'Not Covered', color: 'red-500', icon: 'x-circle' },
+            { name: 'Charlie', type: 'Dog', avatar: 'C', status: 'Active Coverage', color: 'green-500', icon: 'check-circle' },
+            { name: 'Daisy', type: 'Bird', avatar: 'D', status: 'Not Eligible', color: 'gray-500', icon: 'x-circle' },
+        ];
+        
+        const installmentTerms = [
+            { months: 3, rate: 0.00, label: '3 Months', popular: false },
+            { months: 4, rate: 0.00, label: '4 Months', popular: false },
+            { months: 6, rate: 0.00, label: '6 Months', popular: true },
+            { months: 10, rate: 0.00, label: '10 Months', popular: false },
+            { months: 12, rate: 0.0059, label: '12 Months', popular: false }, // 0.59%
+            { months: 16, rate: 0.0079, label: '16 Months', popular: false }, // 0.79%
+        ];
+
+        // Function to update the view
+        function renderPage(pageName) {
+            currentPage = pageName;
+            const root = document.getElementById('app-root');
+            root.innerHTML = ''; // Clear existing content
+
+            // Close any open modals
+            document.getElementById('modal-root').innerHTML = '';
+
+            let contentHTML;
+            switch (pageName) {
+                case 'home': contentHTML = renderHome(); break;
+                case 'profile': contentHTML = renderPetProfile(); break;
+                case 'list': contentHTML = renderPrivilegeList('Lifestyle', '#E06D55'); break;
+                case 'detail': contentHTML = renderPrivilegeDetail(); break;
+                case 'u_plan': contentHTML = renderUPlan(); break;
+                case 'u_insure': contentHTML = renderUInsure(); break;
+                case 'redemption': contentHTML = renderRedemptionModal(); break;
+                case 'register_pet': contentHTML = renderRegisterPet(); break;
+                case 'apply_card': contentHTML = renderApplyCard(); break;
+                case 'trending_list': contentHTML = renderTrendingList(); break;
+                default: contentHTML = '<div>Page Not Found</div>';
+            }
+
+            root.innerHTML = contentHTML;
+        }
+
+        // --- Shared Components ---
+
+        function Header(title, backAction = 'home') {
+            return `
+                <div class="p-4 flex items-center justify-between sticky top-0 bg-white border-b border-gray-100 z-10">
+                    <button onclick="renderPage('${backAction}')" class="text-pet-dark">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                        </svg>
+                    </button>
+                    <h1 class="text-xl font-bold text-pet-dark">${title}</h1>
+                    <button onclick="renderPage('profile')" class="text-pet-dark">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                    </button>
+                </div>
+            `;
+        }
+
+        // --- 1. Home Screen (Updated for Taller Screen and Hero Fix) ---
+        function renderHome() {
+            return `
+                ${Header('U PETSTIGE', 'home')}
+                <div class="scrollable-content bg-gray-50">
+                    <!-- Top Banner Section (Styled Hero) -->
+                    <div class="h-60 bg-amber-100 relative shadow-md rounded-b-3xl overflow-hidden" style="background-color: #F8E0CC;">
+                        <!-- Illustration Placeholder (Styled to look like the reference image) -->
+                        <div class="absolute inset-0 z-0 flex justify-end items-end">
+                            <img src="https://placehold.co/430x300/E0D4C7/774B00?text=Pet+Owner+Illustration" class="w-full h-full object-cover opacity-80" onerror="this.src='https://placehold.co/430x300/E0D4C7/774B00?text=Pet+Owner+Illustration'">
+                        </div>
+                        
+                        <!-- Fixed Overlap Text: Text is now stacked neatly in the bottom left -->
+                        <div class="absolute bottom-4 left-6 z-10">
+                            <h3 class="text-xl font-extrabold text-pet-dark mb-1">DON'T LEAVE PET BEHIND</h3>
+                            <h2 class="text-3xl font-black text-pet-primary leading-tight">U PETSTIGE</h2>
+                        </div>
+                    </div>
+
+                    <!-- Featured Promos & CTAs -->
+                    <div class="p-4 -mt-10 relative z-20 space-y-4">
+                        <div class="flex space-x-3">
+                            <div onclick="renderPage('u_plan')" class="flex-1 promo-card cursor-pointer hover:shadow-xl transition border-l-4 border-pet-primary">
+                                <h3 class="text-sm font-semibold text-pet-dark">แบ่งชำระ: 0%</h3>
+                                <p class="text-xs text-gray-500 mb-2">หรือ ดอกเบี้ยพิเศษ (U PLAN)</p>
+                                <span class="text-pet-primary font-bold text-sm">U PLAN</span>
+                            </div>
+                            <div onclick="renderPage('u_insure')" class="flex-1 promo-card cursor-pointer hover:shadow-xl transition border-l-4 border-pet-accent">
+                                <h3 class="text-sm font-semibold text-pet-dark">ประกันสัตว์เลี้ยง</h3>
+                                <p class="text-xs text-gray-500 mb-2">ดูแลสัตว์เลี้ยงที่คุณรัก (U INSURE)</p>
+                                <span class="text-pet-accent font-bold text-sm">U INSURE</span>
+                            </div>
+                        </div>
+
+                        <!-- Pet Registration CTA -->
+                        <div onclick="renderPage('register_pet')" class="promo-card flex items-center justify-between cursor-pointer hover:shadow-lg transition border-l-4 border-register-brown">
+                            <div>
+                                <h3 class="font-semibold text-pet-dark">Register Your Pet</h3>
+                                <p class="text-xs text-gray-500">Ensure Max is eligible for all benefits.</p>
+                            </div>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-register-brown" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
+                        </div>
+                        
+                        <!-- PET Card Application CTA -->
+                        <div onclick="renderPage('apply_card')" class="promo-card flex items-center justify-between cursor-pointer hover:shadow-lg transition border-l-4 border-apply-gray">
+                            <div>
+                                <h3 class="font-semibold text-pet-dark">Apply for PET Card</h3>
+                                <p class="text-xs text-gray-500">Switch your card for exclusive rates and benefits.</p>
+                            </div>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-apply-gray" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+                        </div>
+                    </div>
+
+                    <!-- Recommended Privileges -->
+                    <h3 class="text-lg font-bold text-pet-dark px-4 mt-6 mb-3">สิทธิพิเศษที่เราแนะนำ (Recommended Privileges)</h3>
+                    <div class="flex justify-around px-2">
+                        ${renderIcon('Lifestyle', 'briefcase', 'list', 'pet-primary')}
+                        ${renderIcon('Pet Supplies', 'shopping-bag', 'list', 'pet-primary')}
+                        ${renderIcon('Activities', 'calendar', 'list', 'pet-primary')}
+                        ${renderIcon('Donate', 'heart', 'list', 'pet-primary')}
+                    </div>
+
+                    <!-- U Petsige Trending Heading with 'See All' link -->
+                    <div class="flex justify-between items-center px-4 mt-6 mb-3">
+                        <h3 class="text-lg font-bold text-pet-dark">U Petsige Trending</h3>
+                        <button onclick="renderPage('trending_list')" class="text-sm font-semibold text-pet-primary hover:underline">See All</button>
+                    </div>
+                    <div class="flex overflow-x-auto space-x-4 px-4 pb-4">
+                        ${trendContents.map(content => renderTrendCard(content)).join('')}
+                    </div>
+                </div>
+            `;
+        }
+        
+        // --- NEW SCREENS ---
+        
+        // 7. Register Your Pet Screen (Styled to use pet-primary accents)
+        function renderRegisterPet() {
+            return `
+                ${Header('Register Your Pet', 'home')}
+                <div class="scrollable-content p-6 bg-gray-50">
+                    <div class="bg-pet-secondary p-4 rounded-xl mb-6 flex flex-col items-center border-2 border-pet-primary">
+                        <img src="https://placehold.co/150x150/E06D55/ffffff?text=New+Pet+Registration" class="w-24 h-24 rounded-full object-cover mb-4" onerror="this.src='https://placehold.co/150x150/E06D55/ffffff?text=New+Pet+Registration'">
+                        <h2 class="text-xl font-bold text-pet-primary">Welcome to the Pack!</h2>
+                        <p class="text-sm text-gray-600 text-center">Register your pet to unlock personalized benefits, insurance quotes, and exclusive deals.</p>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-xl shadow-md space-y-4">
+                        <h3 class="text-lg font-bold text-pet-dark border-b pb-2">Pet Details</h3>
+                        <input type="text" placeholder="Pet's Name (e.g., Max)" class="w-full p-3 border border-gray-300 rounded-lg focus:border-pet-primary focus:ring-pet-primary">
+                        <select class="w-full p-3 border border-gray-300 rounded-lg focus:border-pet-primary focus:ring-pet-primary">
+                            <option>Pet Type: Dog</option>
+                            <option>Pet Type: Cat</option>
+                            <option>Pet Type: Other</option>
+                        </select>
+                        <input type="date" class="w-full p-3 border border-gray-300 rounded-lg focus:border-pet-primary focus:ring-pet-primary">
+                        <div class="flex space-x-4">
+                            <label class="flex items-center text-sm font-medium"><input type="radio" name="gender" class="text-pet-primary mr-2 focus:ring-pet-primary" checked> Male</label>
+                            <label class="flex items-center text-sm font-medium"><input type="radio" name="gender" class="text-pet-primary mr-2 focus:ring-pet-primary"> Female</label>
+                        </div>
+                    </div>
+                    
+                    <button onclick="renderPage('profile')" class="w-full bg-pet-primary text-white font-semibold py-4 mt-8 rounded-xl shadow-lg hover:bg-pet-dark transition">
+                        Complete Registration
+                    </button>
+                </div>
+            `;
+        }
+
+        // 8. Apply for PET Card Screen (Two Options)
+        function renderApplyCard() {
+            return `
+                ${Header('Apply for PET Card', 'home')}
+                <div class="scrollable-content p-6 bg-gray-50">
+                    <div class="bg-apply-gray/10 p-4 rounded-xl mb-6 flex flex-col items-center border-2 border-apply-gray">
+                        <img src="https://placehold.co/200x120/4B5563/ffffff?text=PET+CARD+Design" class="w-4/5 h-auto rounded-lg mb-4 shadow-xl" onerror="this.src='https://placehold.co/200x120/4B5563/ffffff?text=PET+CARD+Design'">
+                        <h2 class="text-xl font-bold text-apply-gray">PET Card Exclusive</h2>
+                        <p class="text-sm text-gray-600 text-center">Customize your card and earn premium rewards.</p>
+                    </div>
+
+                    <!-- Option 1: Digital Card -->
+                    <div class="bg-white p-4 rounded-xl shadow-md mb-6 border-2 border-pet-primary">
+                        <h3 class="text-lg font-bold text-pet-dark mb-2">1. Digital PET Card (Free)</h3>
+                        <ul class="list-disc list-inside text-sm text-gray-600 space-y-1 ml-4">
+                            <li>Instant access to U PETstige deals & privileges.</li>
+                            <li>Personalized digital card with pet picture.</li>
+                            <li>Basic reward points accrual (1X).</li>
+                        </ul>
+                        <button onclick="alert('Starting Digital Card application.')" class="w-full bg-pet-primary text-white font-semibold py-2 mt-4 rounded-lg hover:bg-pet-dark transition">
+                            Apply for Digital PET Card
+                        </button>
+                    </div>
+
+                    <!-- Option 2: Physical Card -->
+                    <div class="bg-white p-4 rounded-xl shadow-md border-2 border-apply-gray">
+                        <h3 class="text-lg font-bold text-apply-gray mb-2">2. Physical PET Card (Premium)</h3>
+                        <ul class="list-disc list-inside text-sm text-gray-600 space-y-1 ml-4">
+                            <li>**2X Reward Points** on all spending.</li>
+                            <li>**2% Cashback** on all pet category spending.</li>
+                            <li>Longer 0% installment terms (Up to 10 months).</li>
+                            <li>Personalized physical card with pet picture.</li>
+                        </ul>
+                        <button onclick="alert('Starting Physical Card application.')" class="w-full bg-apply-gray text-white font-semibold py-2 mt-4 rounded-lg hover:bg-apply-gray/90 transition">
+                            Apply for Physical PET Card
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // 9. Trending List Screen (New)
+        function renderTrendingList() {
+            return `
+                ${Header('U Petsige Trending', 'home')}
+                <div class="scrollable-content p-4 bg-gray-50">
+                    <input type="text" placeholder="Search trends, partners, or topics..." class="w-full p-3 mb-4 border border-gray-300 rounded-xl focus:ring-pet-primary focus:border-pet-primary">
+                    
+                    <div class="flex space-x-2 overflow-x-auto pb-3">
+                        <span class="whitespace-nowrap px-4 py-1 text-sm rounded-full bg-pet-primary text-white cursor-pointer shadow-md">All</span>
+                        <span class="whitespace-nowrap px-4 py-1 text-sm rounded-full bg-gray-100 text-gray-700 cursor-pointer hover:bg-pet-secondary">Lifestyle</span>
+                        <span class="whitespace-nowrap px-4 py-1 text-sm rounded-full bg-gray-100 text-gray-700 cursor-pointer hover:bg-pet-secondary">Activities</span>
+                        <span class="whitespace-nowrap px-4 py-1 text-sm rounded-full bg-gray-100 text-gray-700 cursor-pointer hover:bg-pet-secondary">Health</span>
+                        <span class="whitespace-nowrap px-4 py-1 text-sm rounded-full bg-gray-100 text-gray-700 cursor-pointer hover:bg-pet-secondary">Nearby (Ari)</span>
+                    </div>
+
+                    <div class="space-y-3 pt-2">
+                        ${trendContents.map(content => renderTrendingListItem(content)).join('')}
+                    </div>
+                </div>
+            `;
+        }
+        
+        function renderTrendingListItem(content) {
+            let badge = '';
+            if (content.exclusive) {
+                badge = '<span class="text-xs font-bold text-pet-accent">EXCLUSIVE</span>';
+            } else if (content.popular) {
+                badge = '<span class="text-xs font-bold text-green-500">POPULAR</span>';
+            }
+            
+            return `
+                <div onclick="renderPage('detail')" class="bg-white p-4 rounded-xl shadow-md flex items-start space-x-4 cursor-pointer hover:shadow-lg transition">
+                    <div class="w-16 h-16 flex items-center justify-center rounded-lg bg-pet-secondary flex-shrink-0">
+                        <span class="text-xs text-pet-dark">${content.category}</span>
+                    </div>
+                    <div class="flex-1">
+                        <div class="flex justify-between items-start">
+                            <div class="text-sm font-bold text-pet-dark">${content.title}</div>
+                            ${badge}
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">${content.partner} · ${content.location}</p>
+                    </div>
+                </div>
+            `;
+        }
+        // --- END NEW SCREENS ---
+
+        // --- U PLAN Modal Functions ---
+        
+        function openApplyPlanModal(transactionId) {
+            const tx = transactions.find(t => t.id === transactionId);
+            if (!tx) return;
+
+            const modalContent = `
+                <div class="modal-overlay" onclick="closeModal()">
+                    <div class="modal-content" onclick="event.stopPropagation()">
+                        <div class="flex justify-between items-center border-b pb-3 mb-4">
+                            <h2 class="text-xl font-bold text-pet-dark">Apply Installment Plan</h2>
+                            <button onclick="closeModal()" class="text-gray-500 hover:text-pet-dark">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+
+                        <div class="bg-pet-secondary p-3 rounded-xl mb-4 text-center">
+                            <p class="text-sm text-gray-600">Transaction:</p>
+                            <p class="text-lg font-bold text-pet-dark">${tx.merchant}</p>
+                            <p class="text-2xl font-extrabold text-pet-primary">${tx.amount.toLocaleString()} THB</p>
+                        </div>
+                        
+                        <h3 class="font-bold text-pet-dark mb-3">Choose Your Term</h3>
+                        <div id="modalTermOptions" class="space-y-3">
+                            ${installmentTerms.map(term => renderModalTermOption(term, tx.amount)).join('')}
+                        </div>
+
+                        <button onclick="closeModal(); alert('Plan applied successfully to ${tx.amount.toLocaleString()} THB!')" 
+                                class="w-full bg-pet-primary text-white font-semibold py-3 mt-6 rounded-xl hover:bg-pet-dark transition">
+                            Confirm Plan
+                        </button>
+                        <p class="text-xs text-gray-500 text-center mt-3">Monthly payment will be billed to your linked PETstige Card.</p>
+                    </div>
+                </div>
+            `;
+            document.getElementById('modal-root').innerHTML = modalContent;
+            // Set the default selection
+            // We ensure this runs after the content is loaded
+            setTimeout(() => {
+                const defaultTerm = document.getElementById(`modal-term-6`);
+                if (defaultTerm) defaultTerm.classList.add('border-4', 'border-pet-primary');
+            }, 0);
+        }
+
+        function renderModalTermOption(term, amount) {
+            const totalInterest = (amount * term.rate * term.months);
+            const monthlyPrincipal = amount / term.months;
+            const monthlyPayment = (monthlyPrincipal + totalInterest / term.months).toFixed(0);
+
+            const isZeroPercent = term.rate === 0.00;
+            const rateText = isZeroPercent ? '0% Interest' : `${(term.rate * 100 * 12).toFixed(2)}% APR`;
+            const bgClass = isZeroPercent ? 'bg-green-50' : 'bg-pet-secondary';
+
+            return `
+                <div id="modal-term-${term.months}" onclick="selectModalTerm(this)" 
+                     class="p-3 rounded-xl shadow-sm cursor-pointer ${bgClass} border-2 border-transparent hover:border-pet-primary transition">
+                    <div class="flex justify-between items-center">
+                        <div class="font-semibold text-pet-dark">${term.months} Months</div>
+                        <div class="text-sm font-medium ${isZeroPercent ? 'text-green-600' : 'text-pet-accent'}">${rateText}</div>
+                    </div>
+                    <div class="text-xs text-gray-500 mt-1 flex justify-between">
+                        <span>Monthly Payment:</span>
+                        <span class="font-bold text-pet-dark text-base">${monthlyPayment} THB</span>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function selectModalTerm(element) {
+            document.querySelectorAll('#modalTermOptions > div').forEach(div => {
+                div.classList.remove('border-4', 'border-pet-primary');
+            });
+            element.classList.add('border-4', 'border-pet-primary');
+        }
+
+        function openViewPlansModal(merchantName) {
+             const modalContent = `
+                <div class="modal-overlay" onclick="closeModal()">
+                    <div class="modal-content" onclick="event.stopPropagation()">
+                        <div class="flex justify-between items-center border-b pb-3 mb-4">
+                            <h2 class="text-xl font-bold text-pet-dark">${merchantName} Plans</h2>
+                            <button onclick="closeModal()" class="text-gray-500 hover:text-pet-dark">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+
+                        <p class="text-sm text-gray-600 mb-4">These are the exclusive installment terms available at **${merchantName}** when paying with your PETstige Card.</p>
+                        
+                        <div class="space-y-3">
+                            <!-- Merchant specific term examples -->
+                            <div class="p-4 rounded-xl bg-green-100 border-l-4 border-green-500">
+                                <h3 class="font-bold text-lg text-green-700">0% Interest Plans</h3>
+                                <p class="text-sm text-gray-600 mt-1">Available for 3, 4, 6, and 10 month terms.</p>
+                            </div>
+                            <div class="p-4 rounded-xl bg-pet-secondary border-l-4 border-pet-primary">
+                                <h3 class="font-bold text-lg text-pet-dark">Longer Term Plans</h3>
+                                <p class="text-sm text-gray-600 mt-1">12 Months @ 0.59% APR | 16 Months @ 0.79% APR</p>
+                            </div>
+                        </div>
+
+                        <button onclick="closeModal()" class="w-full bg-pet-accent text-white font-semibold py-3 mt-6 rounded-xl hover:opacity-90 transition">
+                            OK, Got It
+                        </button>
+                    </div>
+                </div>
+            `;
+            document.getElementById('modal-root').innerHTML = modalContent;
+        }
+
+        function closeModal() {
+            document.getElementById('modal-root').innerHTML = '';
+        }
+
+        // --- U Plan Screen (Installments) ---
+        function renderUPlan() {
+            return `
+                ${Header('U Plan - Installments', 'home')}
+                <div class="scrollable-content p-6">
+                    <h2 class="text-xl font-bold text-pet-dark mb-4">Apply Installment to Recent Spend</h2>
+
+                    <!-- Transactions List -->
+                    <h3 class="font-bold text-pet-dark border-b pb-2 mb-3">Eligible Pet-Related Transactions</h3>
+                    <div class="space-y-3 mb-8">
+                        ${transactions.map(tx => renderTransactionCard(tx)).join('')}
+                    </div>
+
+                    <!-- Calculator Link (Still useful for estimation) -->
+                    <button onclick="alert('Opens Calculator Modal to estimate payments on new purchases.')" class="w-full bg-gray-100 text-pet-dark font-semibold py-3 rounded-xl shadow-inner mb-6 hover:bg-gray-200 transition">
+                        Estimate Payments for New Purchase
+                    </button>
+
+                    <h3 class="text-lg font-bold text-pet-dark mb-3">Partner Merchants (Available Terms)</h3>
+                    <div class="space-y-3">
+                        ${renderMerchantTile('VET Clinic Group', '0% for 3, 6, 10 Months', 'pet-primary', true)}
+                        ${renderMerchantTile('Premium Pet Foods', '0% for 6 Months', 'pet-accent', true)}
+                        ${renderMerchantTile('Pet Supplies Mega-Store', '12 & 16 Month Terms', 'gray-700', true)}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderTransactionCard(tx) {
+            if (tx.applied) {
+                return `
+                    <div class="bg-green-50 p-4 rounded-xl flex justify-between items-center opacity-80 border-l-4 border-green-500">
+                        <div>
+                            <div class="text-sm text-green-700 font-bold">Plan Applied: ${tx.plan}</div>
+                            <div class="font-semibold text-pet-dark">${tx.merchant}</div>
+                            <p class="text-xs text-gray-500">${tx.date} | ${tx.amount.toLocaleString()} THB</p>
+                        </div>
+                        <span class="text-xs text-green-700 font-semibold">ACTIVE</span>
+                    </div>
+                `;
+            }
+            
+            // Non-applied transaction
+            return `
+                <div class="bg-white p-4 rounded-xl shadow-sm flex justify-between items-center border border-gray-200">
+                    <div>
+                        <div class="font-semibold text-pet-dark">${tx.merchant}</div>
+                        <p class="text-sm text-pet-primary font-bold">${tx.amount.toLocaleString()} THB</p>
+                        <p class="text-xs text-gray-500">${tx.date}</p>
+                    </div>
+                    <button onclick="openApplyPlanModal(${tx.id})" 
+                            class="bg-pet-primary text-white text-xs px-3 py-2 rounded-full hover:bg-pet-dark transition">
+                        Apply Plan
+                    </button>
+                </div>
+            `;
+        }
+        
+        function renderMerchantTile(name, terms, color, useModal = false) {
+            const action = useModal ? `openViewPlansModal('${name}')` : `alert('Viewing plans for ${name}')`;
+            return `
+                <div class="bg-white p-4 rounded-xl shadow-md flex justify-between items-center border-l-4 border-${color}">
+                    <div>
+                        <div class="font-semibold text-pet-dark">${name}</div>
+                        <p class="text-xs text-gray-500">${terms}</p>
+                    </div>
+                    <button onclick="${action}" class="text-pet-accent text-sm font-semibold hover:underline">View Plans</button>
+                </div>
+            `;
+        }
+
+        // --- 6. U Insure Screen ---
+        function renderUInsure() {
+            return `
+                ${Header('U Insure - Pet Insurance', 'home')}
+                <div class="scrollable-content p-6">
+                    <h2 class="text-xl font-bold text-pet-dark mb-4">Pet Coverage Status</h2>
+
+                    <!-- Pet Coverage List -->
+                    <div class="space-y-3 mb-8">
+                        ${renderPetCoverageList()}
+                    </div>
+
+                    <h2 class="text-xl font-bold text-pet-dark mb-4">Choose Your Coverage</h2>
+
+                    <!-- Coverage Type Selector -->
+                    <div class="flex space-x-4 mb-6">
+                        <button id="coverage-pet" onclick="selectCoverage('pet')" class="flex-1 p-3 rounded-xl shadow-lg border-2 border-pet-accent bg-pet-accent/10 transition">
+                            <span class="font-semibold text-pet-dark block">Pet Health Insurance</span>
+                            <span class="text-xs text-gray-600">Accidents & Illness</span>
+                        </button>
+                        <button id="coverage-owner" onclick="selectCoverage('owner')" class="flex-1 p-3 rounded-xl shadow-lg border-2 border-gray-300 hover:border-pet-accent transition">
+                            <span class="font-semibold text-pet-dark block">Owner Liability Insurance</span>
+                            <span class="text-xs text-gray-600">3rd Party Damage</span>
+                        </button>
+                    </div>
+
+                    <!-- Plan Tabs -->
+                    <div class="flex justify-around bg-gray-100 p-1 rounded-xl mb-4">
+                        ${renderPlanTab('basic', 'Basic')}
+                        ${renderPlanTab('premium', 'Premium')}
+                        ${renderPlanTab('comprehensive', 'Comp.')}
+                    </div>
+
+                    <!-- Plan Details -->
+                    <div id="plan-details" class="bg-white p-4 rounded-xl shadow-md space-y-3">
+                        ${renderPlanDetails('basic')}
+                    </div>
+
+                    <button onclick="alert('Proceeding to Enrollment Form Screen...')" class="w-full bg-pet-accent text-white font-semibold py-4 mt-6 rounded-xl shadow-xl hover:opacity-90 transition">
+                        GET COVERAGE
+                    </button>
+                </div>
+            `;
+        }
+        
+        function renderPetCoverageList() {
+            return petCoverageData.map(pet => `
+                <div class="flex items-center p-3 bg-white rounded-xl shadow-sm border-2 border-gray-100">
+                    <div class="w-12 h-12 flex items-center justify-center rounded-full bg-pet-secondary mr-4 border-2 border-${pet.color}">
+                        <span class="text-xl font-bold text-pet-dark">${pet.avatar}</span>
+                    </div>
+                    <div class="flex-1">
+                        <span class="font-semibold text-sm text-pet-dark">${pet.name} (${pet.type})</span>
+                        <div class="text-xs font-medium text-${pet.color}">${pet.status}</div>
+                    </div>
+                    <div class="w-6 h-6 flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-${pet.color}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            ${getIconPath(pet.icon)}
+                        </svg>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function renderPlanDetails(planId, isOwner = false) {
+            let title, price, features, insurer, insurerColor, insurerLogo;
+
+            if (isOwner) {
+                title = "Basic Plan - Owner Liability";
+                price = "THB 200";
+                insurer = "Muang Thai";
+                insurerColor = "muang-thai-red";
+                insurerLogo = "M";
+                features = [
+                    'Covers 3rd-party property damage up to 100,000 THB.',
+                    'Covers defense costs in liability claims.',
+                    'Does NOT cover pet injuries or illness.'
+                ];
+            } else if (planId === 'basic') {
+                title = "Basic Plan - Health Coverage";
+                price = "THB 450";
+                insurer = "TIP Insurance";
+                insurerColor = "tip-blue";
+                insurerLogo = "T";
+                features = ['Up to 50,000 THB annual coverage.', 'Covers Accidents only.', 'Excludes pre-existing conditions.'];
+            } else if (planId === 'premium') {
+                title = "Premium Plan - Health Coverage";
+                price = "THB 890";
+                insurer = "TIP Insurance";
+                insurerColor = "tip-blue";
+                insurerLogo = "T";
+                features = ['Up to 200,000 THB annual coverage.', 'Covers Accidents and Common Illnesses.', 'Includes Dental coverage.'];
+            } else if (planId === 'comprehensive') {
+                title = "Comprehensive Plan - Health Coverage";
+                price = "THB 1,490";
+                insurer = "Muang Thai";
+                insurerColor = "muang-thai-red";
+                insurerLogo = "M";
+                features = ['Unlimited annual coverage.', 'Covers Accidents, Illnesses, and Routine Care.', 'Includes alternative therapies and travel coverage.'];
+            }
+            
+            return `
+                <div class="flex items-center justify-between mb-2 pb-2 border-b">
+                    <h3 class="text-xl font-bold text-pet-accent">${title}</h3>
+                    <div class="flex items-center space-x-2">
+                        <div class="w-5 h-5 flex items-center justify-center rounded-full text-xs font-bold text-white" style="background-color: ${tailwind.config.theme.extend.colors[insurerColor]}">${insurerLogo}</div>
+                        <span class="text-xs font-semibold text-gray-600">${insurer}</span>
+                    </div>
+                </div>
+                <p class="text-3xl font-extrabold text-pet-dark">${price}<span class="text-base font-normal text-gray-500"> / month</span></p>
+                <ul class="list-disc list-inside text-sm text-gray-600 space-y-1">
+                    ${features.map(f => `<li>${f}</li>`).join('')}
+                </ul>
+                <button class="text-pet-accent text-sm font-semibold pt-2">View Full Policy Details</button>
+            `;
+        }
+
+        function renderPlanTab(id, name) {
+            const active = id === 'basic' ? 'bg-white shadow' : 'text-gray-600';
+            return `<button id="tab-${id}" onclick="switchPlan('${id}')" class="flex-1 p-2 rounded-lg text-sm font-semibold ${active} transition">${name}</button>`;
+        }
+
+        function selectCoverage(type) {
+            const petButton = document.getElementById('coverage-pet');
+            const ownerButton = document.getElementById('coverage-owner');
+
+            petButton.classList.remove('border-pet-accent', 'bg-pet-accent/10', 'border-gray-300');
+            ownerButton.classList.remove('border-pet-accent', 'bg-pet-accent/10', 'border-gray-300');
+            petButton.classList.add('border-gray-300');
+            ownerButton.classList.add('border-gray-300');
+
+            if (type === 'pet') {
+                petButton.classList.add('border-pet-accent', 'bg-pet-accent/10');
+                petButton.classList.remove('border-gray-300');
+                switchPlan('basic');
+            } else {
+                ownerButton.classList.add('border-pet-accent', 'bg-pet-accent/10');
+                ownerButton.classList.remove('border-gray-300');
+                switchPlan('basic_owner');
+            }
+        }
+
+        function switchPlan(planId) {
+            document.querySelectorAll('[id^="tab-"]').forEach(btn => btn.classList.remove('bg-white', 'shadow'));
+            const activeTabId = planId.replace('_owner', '');
+            const activeTab = document.getElementById(`tab-${activeTabId}`);
+            if (activeTab) activeTab.classList.add('bg-white', 'shadow');
+
+            const details = document.getElementById('plan-details');
+            if (!details) return;
+            
+            const isOwnerPlan = planId.includes('_owner');
+            
+            // Re-render plan details based on selected plan and type
+            details.innerHTML = renderPlanDetails(activeTabId, isOwnerPlan);
+        }
+
+
+        // --- Redemption Modal (Simple Popup) ---
+        function renderRedemptionModal() {
+            return `
+                ${Header('Redeem Offer', 'detail')}
+                <div class="scrollable-content p-6 flex flex-col items-center justify-center text-center">
+                    <h2 class="text-2xl font-bold text-pet-dark mb-2">Ready to Redeem?</h2>
+                    <p class="text-gray-600 mb-6">Ask the merchant to scan this code now. It expires in 5 minutes.</p>
+
+                    <div class="bg-white p-6 rounded-xl shadow-2xl border-4 border-pet-primary">
+                        <img src="https://placehold.co/200x200/4A4A4A/FFFFFF?text=QR+CODE" class="w-48 h-48 mx-auto mb-4">
+                        <div class="text-sm font-mono text-pet-dark mb-4">Code: <span class="font-bold">PET20-9987A</span></div>
+                        <div class="text-xl font-bold text-red-600" id="timer">05:00</div>
+                    </div>
+
+                    <p class="text-xs text-red-500 mt-4 font-medium">⚠️ IMPORTANT: Do NOT navigate away. Code expires soon.</p>
+                    
+                    <button onclick="renderPage('detail')" class="w-full bg-gray-300 text-pet-dark font-semibold py-3 mt-8 rounded-xl hover:bg-gray-400 transition">
+                        Cancel Redemption
+                    </button>
+                </div>
+            `;
+        }
+
+
+        // Helper function for SVG paths (to keep the code clean)
+        function getIconPath(name) {
+            const paths = {
+                'briefcase': '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.593 23.593 0 0112 15c-3.18 0-6.233-.62-9-1.745M12 10V3M4 14v7a2 2 0 002 2h12a2 2 0 002-2v-7M12 3a4 4 0 014 4h-8a4 4 0 014-4z" />',
+                'shopping-bag': '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />',
+                'calendar': '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />',
+                'heart': '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-.318-.318a4.5 4.5 0 00-6.364 0z" />',
+                'user': '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />',
+                'paw': '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 21l7-7 7 7M12 3v18" />',
+                'key': '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2v3a2 2 0 002 2h3a2 2 0 012 2v4a2 2 0 01-2 2H2a2 2 0 01-2-2v-4a2 2 0 012-2h3a2 2 0 002-2V9a2 2 0 012-2h3zm-3 0V4a2 2 0 012-2h3a2 2 0 012 2v3m-7 0a4 4 0 10-8 0 4 4 0 008 0z" />',
+                'check-circle': '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />',
+                'shield-check': '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.104A9.956 9.956 0 0012 2.5a9.956 9.956 0 00-7.618 3.396A10.005 10.005 0 002 12a10.005 10.005 0 002.382 6.504A9.956 9.956 0 0012 21.5a9.956 9.956 0 007.618-3.396A10.005 10.005 0 0022 12a10.005 10.005 0 00-2.382-6.504z" />',
+                'x-circle': '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />',
+                'stethoscope': '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.104A9.956 9.956 0 0012 2.5a9.956 9.956 0 00-7.618 3.396A10.005 10.005 0 002 12a10.005 10.005 0 002.382 6.504A9.956 9.956 0 0012 21.5a9.956 9.956 0 007.618-3.396A10.005 10.005 0 0022 12a10.005 10.005 0 00-2.382-6.504z" />',
+                'clock': '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />'
+            };
+            return paths[name] || '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />';
+        }
+
+
+        // Initialize the app on load
+        window.onload = () => {
+            renderPage('home');
+        };
+
+        // Export functions to global scope for button clicks (Simplified)
+        window.renderPage = renderPage;
+        window.selectCoverage = selectCoverage;
+        window.switchPlan = switchPlan;
+        window.openApplyPlanModal = openApplyPlanModal;
+        window.openViewPlansModal = openViewPlansModal;
+        window.closeModal = closeModal;
+    </script>
+</body>
+</html>
